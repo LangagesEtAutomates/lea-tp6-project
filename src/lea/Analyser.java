@@ -57,7 +57,7 @@ public final class Analyser {
 
 	private Context analyse(Sequence sequence, Context context) {
 		for(var commande : sequence.commands()) {
-			if(!context.accessible) error(sequence, "Code mort", context);
+			if(!context.accessible) error(commande, "Code mort", context);
 			context = analyse(commande, context);
 		}
 		return context;

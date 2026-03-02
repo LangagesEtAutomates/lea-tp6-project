@@ -24,7 +24,7 @@ public class Interpreter {
 		this.reporter=reporter;
 	}
 
-	public void interpret(Program program) {
+	public void execute(Program program) {
 		try {
 			try {
 				interpret(program.body());
@@ -47,26 +47,6 @@ public class Interpreter {
 		}
 	}
 
-	private Value eval(Expression expression) throws PanicException {
-		return switch(expression) {
-		case Value l		-> l;
-		case Identifier id 	-> eval(id);
-		case Sum s			-> eval(s);
-		case Difference d	-> new Int(evalAsInt(d.left()) - evalAsInt(d.right()));
-		case Product p		-> new Int(evalAsInt(p.left()) * evalAsInt(p.right()));
-		case Lower l		-> new Bool(evalAsInt(l.left()) < evalAsInt(l.right()));
-		case Equal e 		-> new Bool(eval(e.left()).equals(eval(e.right())));
-		case And a			-> new Bool(evalAsBool(a.left()) && evalAsBool(a.right()));
-		case Or o 			-> new Bool(evalAsBool(o.left()) || evalAsBool(o.right()));
-		case Inverse i		-> new Int(-evalAsInt(i.argument()));
-		case Length l		-> eval(l);
-		case Index i		-> eval(i);
-		case InitArray i	-> eval(i);
-		case InitList i		-> eval(i);
-		case ErrorNode e	-> throw error(e, "Le programme contient une erreur de syntaxe");
-		};
-	}
-	
 	private void interpret(Assignment assignment) throws PanicException {
 		switch(assignment.lhs()) {
 		case Identifier id	-> variables.put(id, eval(assignment.rhs()));
@@ -83,8 +63,11 @@ public class Interpreter {
 	}
 
 	private void interpret(Write w) throws BreakException, PanicException {
-		for(var argument : w.values()) 
-			System.out.print(evalAsStr(argument));
+		for(var argument : w.values()) {
+			Value value = eval(argument);
+			System.out.print(evalAsStr(value));
+			reporter.out(value);
+		}
 		System.out.println();
 	}
 
@@ -106,7 +89,7 @@ public class Interpreter {
 			while(evalAsBool(w.cond())) {
 				interpret(w.body());
 			}
-		}catch(BreakException e) {}
+		} catch(BreakException e) {}
 	}
 
 	private void interpret(For f) throws BreakException, PanicException {
@@ -116,21 +99,41 @@ public class Interpreter {
 			if(start < end) {
 				int step = f.step().isPresent() ? evalAsInt(f.step().get()) : 1;
 				if(step <= 0) throw error(f.step().get(), "Boucle pour infinie");
-				for(int i = start; i < end; i+=step) {
+				for(int i = start; i <= end; i+=step) {
 					variables.put(f.id(), new Int(i));
 					interpret(f.body());
 				}
 			} else {
 				int step = f.step().isPresent() ? evalAsInt(f.step().get()) : -1;
 				if(step >= 0) throw error(f.step().get(), "Boucle pour infinie");
-				for(int i = start; i > end; i+=step) {
+				for(int i = start; i >= end; i+=step) {
 					variables.put(f.id(), new Int(i));
 					interpret(f.body());
 				}
 			}
-		}catch(BreakException e) {}
+		} catch(BreakException e) {}
 	}
 
+	private Value eval(Expression expression) throws PanicException {
+		return switch(expression) {
+		case Value l		-> l;
+		case Identifier id 	-> eval(id);
+		case Sum s			-> eval(s);
+		case Difference d	-> new Int(evalAsInt(d.left()) - evalAsInt(d.right()));
+		case Product p		-> new Int(evalAsInt(p.left()) * evalAsInt(p.right()));
+		case Lower l		-> new Bool(evalAsInt(l.left()) < evalAsInt(l.right()));
+		case Equal e 		-> new Bool(eval(e.left()).equals(eval(e.right())));
+		case And a			-> new Bool(evalAsBool(a.left()) && evalAsBool(a.right()));
+		case Or o 			-> new Bool(evalAsBool(o.left()) || evalAsBool(o.right()));
+		case Inverse i		-> new Int(-evalAsInt(i.argument()));
+		case Length l		-> eval(l);
+		case Index i		-> eval(i);
+		case InitArray i	-> eval(i);
+		case InitList i		-> eval(i);
+		case ErrorNode e	-> throw error(e, "Le programme contient une erreur de syntaxe");
+		};
+	}
+	
 	private Value eval(Identifier id) throws PanicException {
 		Value v = variables.get(id);
 		if (v != null) return v;

@@ -1,10 +1,5 @@
 package lea;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import java.io.Reader;
-import java.io.StringReader;
-
 import org.junit.jupiter.api.Test;
 
 import lea.Reporter.Phase;
@@ -14,50 +9,22 @@ import lea.Reporter.Phase;
  */
 public final class ParserTest {
 
-	private static Reporter analyse(String source) {
-		Reporter reporter = new Reporter();
-		try(Reader reader = new StringReader(source)) {
-			var lexer = new Lexer(reader, reporter);
-			var parser = new Parser(lexer,reporter);
-			parser.parseProgram();
-			assertTrue(reporter.getErrors(Phase.LEXER).isEmpty(), "Lexing errors");
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-		return reporter;
-	}
-
-	private static void assertHasErrorContaining(String source, String fragment) {
-		Reporter reporter = analyse(source);
-		boolean matches = reporter.getErrors(Phase.PARSER)
-				.stream()
-				.anyMatch(m -> m.contains(fragment));
-		assertTrue(matches,	() -> "Expected error containing: \"" + fragment);
-	}
-
-	private static void assertNoErrors(String source) {
-		Reporter reporter = analyse(source);
-		var runtimeErrors = reporter.getErrors(Phase.PARSER);
-		assertTrue(runtimeErrors.isEmpty(), () -> runtimeErrors.stream().reduce("", (x,y)->x+y+"\n"));
-	}
-
 	/* =========================
 	 * === PROGRAMMES VALIDES ==
 	 * ========================= */
 
 	@Test
 	void minimalProgram_emptyBody() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			début
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoError();
 	}
 
 	@Test
 	void declarations_types_and_arrayType() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -66,13 +33,12 @@ public final class ParserTest {
 			début
 				écrire(x, s, a);
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoErrorAt(Phase.PARSER);
 	}
 
 	@Test
 	void commands_and_expressions_smoke() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -85,13 +51,12 @@ public final class ParserTest {
 				écrire(tableau(3, 0));
 				écrire(x = 7 ou faux et vrai);
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoError();
 	}
 
 	@Test
 	void structuredStatements_if_while_for() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -115,8 +80,7 @@ public final class ParserTest {
 					écrire(i);
 				fin pour
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoErrorAt(Phase.PARSER);
 	}
 
 	/* =========================
@@ -125,13 +89,12 @@ public final class ParserTest {
 
 	@Test
 	void programStructureError_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
 			fin
-			""";
-		assertHasErrorContaining(source, "Erreur dans le programme");
+			""").assertHasErrorContaining(Phase.PARSER, "Erreur dans le programme");
 	}
 
 	/* =========================
@@ -140,7 +103,7 @@ public final class ParserTest {
 
 	@Test
 	void missingExpression_inIfCondition_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 			début
@@ -148,13 +111,12 @@ public final class ParserTest {
 					écrire(1);
 				fin si
 			fin
-			""";
-		assertHasErrorContaining(source, "Expression manquante");
+			""").assertHasErrorContaining(Phase.PARSER, "Expression manquante");
 	}
 
 	@Test
 	void missingExpression_inWhileCondition_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 			début
@@ -162,13 +124,12 @@ public final class ParserTest {
 					écrire(1);
 				fin tant que
 			fin
-			""";
-		assertHasErrorContaining(source, "Expression manquante");
+			""").assertHasErrorContaining(Phase.PARSER, "Expression manquante");
 	}
 
 	@Test
 	void missingExpression_inForStart_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				i : entier;
@@ -177,14 +138,12 @@ public final class ParserTest {
 					écrire(i);
 				fin pour
 			fin
-			""";
-		assertHasErrorContaining(source, "Expression manquante");
+			""").assertHasErrorContaining(Phase.PARSER, "Expression manquante");
 	}
 
 	@Test
 	void missingExpression_inForEnd_isReported() {
-		// "à faire" : end manquant
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				i : entier;
@@ -193,13 +152,12 @@ public final class ParserTest {
 					écrire(i);
 				fin pour
 			fin
-			""";
-		assertHasErrorContaining(source, "Expression manquante");
+			""").assertHasErrorContaining(Phase.PARSER, "Expression manquante");
 	}
 
 	@Test
 	void missingExpression_inForStep_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				i : entier;
@@ -208,8 +166,7 @@ public final class ParserTest {
 					écrire(i);
 				fin pour
 			fin
-			""";
-		assertHasErrorContaining(source, "Expression manquante");
+			""").assertHasErrorContaining(Phase.PARSER, "Expression manquante");
 	}
 
 	/* =========================
@@ -218,7 +175,7 @@ public final class ParserTest {
 
 	@Test
 	void invalidExpression_inIfCondition_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -227,13 +184,12 @@ public final class ParserTest {
 					écrire(1);
 				fin si
 			fin
-			""";
-		assertHasErrorContaining(source, "Erreur dans l'expression");
+			""").assertHasErrorContaining(Phase.PARSER, "Erreur dans l'expression");
 	}
 
 	@Test
 	void invalidExpression_inForEnd_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				i : entier;
@@ -242,8 +198,7 @@ public final class ParserTest {
 					écrire(i);
 				fin pour
 			fin
-			""";
-		assertHasErrorContaining(source, "Erreur dans l'expression");
+			""").assertHasErrorContaining(Phase.PARSER, "Erreur dans l'expression");
 	}
 
 	/* =========================
@@ -252,7 +207,7 @@ public final class ParserTest {
 
 	@Test
 	void recovery_afterBadCommand_continuesUntilEnd() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -261,8 +216,7 @@ public final class ParserTest {
 				x <- 2;
 				écrire(x);
 			fin
-			""";
-		assertHasErrorContaining(source, "Erreur dans la commande");
+			""").assertHasErrorContaining(Phase.PARSER, "Erreur dans la commande");
 	}
 	
 }

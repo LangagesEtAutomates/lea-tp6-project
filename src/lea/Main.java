@@ -74,7 +74,7 @@ public class Main {
 		// Exécution
 		if(hasErrors) return;
 		Interpreter interpreter = new Interpreter(reporter);
-		interpreter.interpret(program);
+		interpreter.execute(program);
 		reporter.reportErrors(Phase.RUNTIME);
 	}
 

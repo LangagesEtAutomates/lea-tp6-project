@@ -1,12 +1,7 @@
 package lea;
 
-import static org.junit.jupiter.api.Assertions.*;
-import java.io.Reader;
-import java.io.StringReader;
-
 import org.junit.jupiter.api.Test;
 
-import lea.Node.Program;
 import lea.Reporter.Phase;
 
 /**
@@ -14,43 +9,13 @@ import lea.Reporter.Phase;
  */
 public final class AnalyserTest {
 
-	private static Reporter analyse(String source) {
-		var reporter = new Reporter();
-		try(Reader reader = new StringReader(source)) {
-			var lexer = new Lexer(reader, reporter);
-			var parser = new Parser(lexer,reporter);
-			var analyser = new Analyser(reporter);
-			Program program = parser.parseProgram();
-			assertTrue(reporter.getErrors(Phase.LEXER).isEmpty(), "Lexing errors");
-			assertTrue(reporter.getErrors(Phase.PARSER).isEmpty(), "Parsing errors");
-			analyser.analyse(program);
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-		return reporter;
-	}
-
-	private static void assertHasErrorContaining(String source, String fragment) {
-		Reporter reporter = analyse(source);
-		boolean matches = reporter.getErrors(Phase.STATIC)
-				.stream()
-				.anyMatch(m -> m.contains(fragment));
-		assertTrue(matches,	() -> "Expected error containing: \"" + fragment);
-	}
-
-	private static void assertNoErrors(String source) {
-		Reporter reporter = analyse(source);
-		var runtimeErrors = reporter.getErrors(Phase.STATIC);
-		assertTrue(runtimeErrors.isEmpty(), () -> runtimeErrors.stream().reduce("", (x,y)->x+y+"\n"));
-	}
-
 	/* =========================
 	 * === INITIALISATION ======
 	 * ========================= */
 
 	@Test
 	void initializedVariable_isOk() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -58,21 +23,19 @@ public final class AnalyserTest {
 				x <- 0;
 				écrire(x);
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoError();
 	}
 
 	@Test
 	void useBeforeInitialization_isReported_straightline() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
 			début
 				x <- x + 1;
 			fin
-			""";
-		assertHasErrorContaining(source, "Variable non initialisée");
+			""").assertHasErrorContaining(Phase.STATIC, "Variable non initialisée");
 	}
 
 	/* =========================
@@ -81,7 +44,7 @@ public final class AnalyserTest {
 
 	@Test
 	void ifWithoutElse_thenAssign_doesNotGuaranteeInitialization() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -91,13 +54,12 @@ public final class AnalyserTest {
 				fin si
 				écrire(x);
 			fin
-			""";
-		assertHasErrorContaining(source, "Variable non initialisée");
+			""").assertHasErrorContaining(Phase.STATIC, "Variable non initialisée");
 	}
 
 	@Test
 	void ifElse_bothBranchesAssign_thenOk() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -109,13 +71,12 @@ public final class AnalyserTest {
 				fin si
 				écrire(x);
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoError();
 	}
 
 	@Test
 	void ifElse_assignDifferentVars_thenNeitherIsCertainlyInitialized() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -129,8 +90,7 @@ public final class AnalyserTest {
 				écrire(x);
 				écrire(y);
 			fin
-			""";
-		assertHasErrorContaining(source, "Variable non initialisée");
+			""").assertHasErrorContaining(Phase.STATIC, "Variable non initialisée");
 	}
 
 	/* =========================
@@ -139,7 +99,7 @@ public final class AnalyserTest {
 
 	@Test
 	void whileMayNotIterate_assignmentInsideDoesNotGuaranteeInitialization() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -149,13 +109,12 @@ public final class AnalyserTest {
 				fin tant que
 				écrire(x);
 			fin
-			""";
-		assertHasErrorContaining(source, "Variable non initialisée");
+			""").assertHasErrorContaining(Phase.STATIC, "Variable non initialisée");
 	}
 
 	@Test
 	void while_assignmentAfterInitialization_isOk() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -166,8 +125,7 @@ public final class AnalyserTest {
 				fin tant que
 				écrire(x);
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoError();
 	}
 
 	/* =========================
@@ -176,7 +134,7 @@ public final class AnalyserTest {
 
 	@Test
 	void forLoop_variableIsConsideredInitializedInBody() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				i : entier;
@@ -185,13 +143,12 @@ public final class AnalyserTest {
 					écrire(i);
 				fin pour
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoError();
 	}
 
 	@Test
 	void forLoop_usesUndeclaredIterator_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 			début
@@ -199,8 +156,7 @@ public final class AnalyserTest {
 					écrire(i);
 				fin pour
 			fin
-			""";
-		assertHasErrorContaining(source, "Variable non déclarée");
+			""").assertHasErrorContaining(Phase.STATIC, "Variable non déclarée");
 	}
 
 	/* =========================
@@ -209,7 +165,7 @@ public final class AnalyserTest {
 
 	@Test
 	void deadCode_afterBreakInSequence_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -218,13 +174,12 @@ public final class AnalyserTest {
 				interrompre;
 				écrire(x);
 			fin
-			""";
-		assertHasErrorContaining(source, "Code mort");
+			""").assertHasErrorContaining(Phase.STATIC, "Code mort");
 	}
 
 	@Test
 	void deadCode_afterBreakInIfBothBranches_isReported() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -237,13 +192,12 @@ public final class AnalyserTest {
 				fin si
 				écrire(x);
 			fin
-			""";
-		assertHasErrorContaining(source, "Code mort");
+			""").assertHasErrorContaining(Phase.STATIC, "Code mort");
 	}
 
 	@Test
 	void noDeadCode_ifBreakOnlyInOneBranch() {
-		String source = """
+		new LeaAsserts("""
 			algorithme
 			variables
 				x : entier;
@@ -256,8 +210,7 @@ public final class AnalyserTest {
 				fin si
 				écrire(x);
 			fin
-			""";
-		assertNoErrors(source);
+			""").assertHasNoErrorUntil(Phase.STATIC);
 	}
 	
 }

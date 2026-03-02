@@ -32,6 +32,16 @@ parser code {:
 			errorSpan = errorSpan.union(reporter.span(currentSymbol.value));
 	}
 
+	@Override
+    public void report_error(String message, Object info) {
+    		reporter.error(Reporter.Phase.PARSER, errorSpan, message);
+    }
+
+    @Override
+    public void report_fatal_error(String message, Object info) {
+    		reporter.error(Reporter.Phase.PARSER, errorSpan, message);
+    }
+    
 	private ErrorNode error(String message) { 
 		reporter.error(Reporter.Phase.PARSER, errorSpan, message);
 		errorSpan = Reporter.Span.EMPTY;
@@ -69,7 +79,7 @@ algo ::=
 	|	ALGORITHME 
 		VARIABLES declarations:d 	
 		DEBUT sequence:s FIN							{: RESULT = new Program(d, s); :}
-	|	error FIN										{: RESULT = new Program(new HashMap<>(), error("Erreur dans le programme")); :}
+	|	error											{: RESULT = new Program(new HashMap<>(), error("Erreur dans le programme")); :}
 ;
 
 declarations ::=
@@ -83,6 +93,9 @@ type ::=
 	|	TABLEAU:deb DE type:t							{: RESULT = mark(new TArray(t), deb, t); :}
 ;
 
+
+ /* Instructions */
+
 sequence ::=
 		/* Empty */										{: RESULT = new Sequence(new ArrayList<>()); :}
 	|	sequence:s instruction:i						{: RESULT = s; RESULT.commands().add(i); :}
@@ -90,10 +103,10 @@ sequence ::=
 ;
 
 instruction ::=	
-		si:s		 									{: RESULT = s; :}
+		commande:c PT_VIRG								{: RESULT = c; :}
+	|	si:s		 									{: RESULT = s; :}
 	|	tantque:t				 						{: RESULT = t; :}
 	|	pour:p				 							{: RESULT = p; :}
-	|	commande:c PT_VIRG								{: RESULT = c; :}
 	|	error PT_VIRG									{: RESULT = error("Erreur dans la commande"); :}
 ;
 
@@ -106,6 +119,18 @@ commande ::=
 affect_gauche ::=
 		ID:id 											{: RESULT = id; :}
 	|	terme:t CROCHET_G expression:e CROCHET_D:fin	{: RESULT = mark(new Index(t,e), t, fin); :}
+;
+
+si ::=
+		SI:deb catch_expr:cond ALORS 
+			sequence:iftrue
+		SINON 
+			sequence:iffalse 
+		FIN SI:fin										{: RESULT = mark(new If(cond, iftrue, Optional.of(iffalse)), deb, fin); :}
+	|	SI:deb catch_expr:cond ALORS 
+			sequence:iftrue
+		FIN SI:fin										{: RESULT = mark(new If(cond, iftrue, Optional.empty()), deb, fin); :}
+ 	|	error FIN SI									{: RESULT = error("Erreur dans la conditionnelle"); :}
 ;
 
 tantque ::=
@@ -124,17 +149,7 @@ pour ::=
  	|	error FIN POUR									{: RESULT = error("Erreur dans la boucle pour"); :}
 ;
 
-si ::=
-		SI:deb catch_expr:cond ALORS 
-			sequence:iftrue
-		SINON 
-			sequence:iffalse 
-		FIN SI:fin										{: RESULT = mark(new If(cond, iftrue, Optional.of(iffalse)), deb, fin); :}
-	|	SI:deb catch_expr:cond ALORS 
-			sequence:iftrue
-		FIN SI:fin										{: RESULT = mark(new If(cond, iftrue, Optional.empty()), deb, fin); :}
- 	|	error FIN SI									{: RESULT = error("Erreur dans la conditionnelle"); :}
-;
+
 
  /* Expressions */
 
@@ -167,7 +182,7 @@ comparison ::=
 somme ::=
 		produit:p										{: RESULT = p; :}
 	|	somme:l	PLUS	produit:r						{: RESULT = mark(new Sum(l, r), l, r); :}
-	|	somme:l	MOINS	produit:r						{: RESULT = mark(new Sum(l, r), l, r); :}
+	|	somme:l	MOINS	produit:r						{: RESULT = mark(new Difference(l, r), l, r); :}
 ;
 
 produit ::=

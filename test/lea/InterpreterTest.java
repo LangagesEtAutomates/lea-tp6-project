@@ -1,13 +1,9 @@
 package lea;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import java.io.Reader;
-import java.io.StringReader;
 
 import org.junit.jupiter.api.Test;
 
-import lea.Node.Program;
+import lea.Node.*;
 import lea.Reporter.Phase;
 
 /**
@@ -15,265 +11,347 @@ import lea.Reporter.Phase;
  */
 public final class InterpreterTest {
 
-	private static Reporter analyse(String source) {
-		Reporter reporter = new Reporter();
-		try(Reader reader = new StringReader(source)) {
-			var lexer = new Lexer(reader, reporter);
-			var parser = new Parser(lexer,reporter);
-			var analyser = new Analyser(reporter);
-			var typeChecker = new TypeChecker(reporter);
-			var interpreter = new Interpreter(reporter);
-			Program program = parser.parseProgram();
-			analyser.analyse(program);
-			typeChecker.checkProgram(program);
-			assertTrue(reporter.getErrors(Phase.LEXER).isEmpty(), "Lexing errors");
-			assertTrue(reporter.getErrors(Phase.PARSER).isEmpty(), "Parsing errors");
-			assertTrue(reporter.getErrors(Phase.STATIC).isEmpty(), "Static errors");
-			assertTrue(reporter.getErrors(Phase.TYPE).isEmpty(), "Type errors");
-			interpreter.interpret(program);
-		} catch (Exception e) {
-			fail(e);
-		}
-		return reporter;
-	}
-
-	private static void assertHasErrorContaining(String source, String fragment) {
-		Reporter reporter = analyse(source);
-		boolean matches = reporter.getErrors(Phase.RUNTIME)
-				.stream()
-				.anyMatch(m -> m.contains(fragment));
-		assertTrue(matches,	() -> "Expected error containing: \"" + fragment + "\"");
-	}
-
-	private static void assertNoErrors(String source) {
-		Reporter reporter = analyse(source);
-		var runtimeErrors = reporter.getErrors(Phase.RUNTIME);
-		assertTrue(runtimeErrors.isEmpty(), () -> runtimeErrors.stream().reduce("", (x,y)->x+y+"\n"));
-	}
-	
 
 	/* =========================
-	 * === NORMAL CASES ========
+	 * === NORMAL CASES =========
 	 * ========================= */
 
 	@Test
 	void simpleAssignmentsAndExpressions() {
-		String source = """
-			algorithme
-			variables
-				x : entier;
-				y : entier;
-			début
-				x <- 1;
-				y <- x + 1;
-				écrire("Résultat=", y * 3);
-			fin
-			""";
-		assertNoErrors(source);
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				  y : entier;
+				début
+				  x <- 1;
+				  y <- x + 1;
+				  écrire("Résultat=", y * 3);
+				fin
+				""").assertOutputs(new Str("Résultat="), new Int(6));
 	}
 
 	@Test
 	void ifThenElseExecution() {
-		String source = """
-			algorithme
-			variables
-				x : entier;
-			début
-				x <- 0;
-				si x = 0 alors
-					x <- 1;
-				sinon
-					x <- 2;
-				fin si
-				écrire(x);
-			fin
-			""";
-		assertNoErrors(source);
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				début
+				  x <- 0;
+				  si x = 0 alors
+				    x <- 1;
+				  sinon
+				    x <- 2;
+				  fin si
+				  écrire(x);
+				fin
+				""").assertOutputs(new Int(1));
+	}
+
+	@Test
+	void nestedIf_executesCorrectBranch() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				début
+				  x <- 2;
+				  si x < 3 alors
+				    si x = 2 alors
+				      écrire(10);
+				    sinon
+				      écrire(11);
+				    fin si
+				  sinon
+				    écrire(12);
+				  fin si
+				fin
+				""").assertOutputs(new Int(10));
 	}
 
 	@Test
 	void whileLoopExecution() {
-		String source = """
-			algorithme
-			variables
-				x : entier;
-			début
-				x <- 0;
-				tant que x < 3 faire
-					x <- x + 1;
-				fin tant que
-				écrire(x);
-			fin
-			""";
-		assertNoErrors(source);
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				début
+				  x <- 0;
+				  tant que x < 3 faire
+				    x <- x + 1;
+				  fin tant que
+				  écrire(x);
+				fin
+				""").assertOutputs(new Int(3));
+	}
+
+	@Test
+	void whileLoop_zeroIterations_doesNotExecuteBody() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				début
+				  x <- 0;
+				  tant que x < 0 faire
+				    x <- 1;
+				  fin tant que
+				  écrire(x);
+				fin
+				""").assertOutputs(new Int(0));
+	}
+
+	@Test
+	void breakInsideLoop_exitsLoop() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				début
+				  x <- 0;
+				  tant que x < 10 faire
+				    x <- x + 1;
+				    si x = 3 alors
+				      interrompre;
+				    fin si
+				  fin tant que
+				  écrire(x);
+				fin
+				""").assertOutputs(new Int(3));
 	}
 
 	@Test
 	void forLoopIncreasing() {
-		String source = """
-			algorithme
-			variables
-				i : entier;
-				s : entier;
-			début
-				s <- 0;
-				pour i de 1 à 5 faire
-					s <- s + i;
-				fin pour
-				écrire(s);
-			fin
-			""";
-		assertNoErrors(source);
+		new LeaAsserts("""
+				algorithme
+				variables
+				  i : entier;
+				  s : entier;
+				début
+				  s <- 0;
+				  pour i de 1 à 5 faire
+				    s <- s + i;
+				  fin pour
+				  écrire(s);
+				fin
+				""").assertOutputs(new Int(15));
+	}
+
+	@Test
+	void forLoopWithStep() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  i : entier;
+				  s : entier;
+				début
+				  s <- 0;
+				  pour i de 1 à 6 pas 2 faire
+				    s <- s + i;
+				  fin pour
+				  écrire(s);
+				fin
+				""").assertOutputs(new Int(9));
 	}
 
 	@Test
 	void forLoopDecreasing() {
-		String source = """
-			algorithme
-			variables
-				i : entier;
-				s : entier;
-			début
-				s <- 0;
-				pour i de 5 à 1 pas -1 faire
-					s <- s + i;
-				fin pour
-				écrire(s);
-			fin
-			""";
-		assertNoErrors(source);
+		new LeaAsserts("""
+				algorithme
+				variables
+				  i : entier;
+				  s : entier;
+				début
+				  s <- 0;
+				  pour i de 5 à 1 faire
+				    s <- s + i;
+				  fin pour
+				  écrire(s);
+				fin
+				""").assertOutputs(new Int(15));
 	}
 
 	@Test
+	void forLoop_singleIteration_whenStartEqualsEnd() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  i : entier;
+				début
+				  pour i de 3 à 3 faire
+				    écrire(i);
+				  fin pour
+				fin
+				""").assertOutputs(new Int(3));
+	}
+
+
+	@Test
 	void arraysAndIndexing() {
-		String source = """
-			algorithme
-			variables
-				a : tableau de entier;
-			début
-				a <- [1, 2, 3];
-				a[2] <- 5;
-				écrire("arraysAndIndexing: ", a[2]);
-			fin
-			""";
-		assertNoErrors(source);
+		new LeaAsserts("""
+				algorithme
+				variables
+				  a : tableau de entier;
+				début
+				  a <- [1, 2, 3];
+				  a[2] <- 5;
+				  écrire(a[2]);
+				fin
+				""").assertOutputs(new Int(5));
 	}
 
 	@Test
 	void stringsAndLength() {
-		String source = """
-			algorithme
-			variables
-				s : chaîne;
-			début
-				s <- "abc";
-				écrire(longueur(s));
-				écrire(s[2]);
-			fin
-			""";
-		assertNoErrors(source);
+		new LeaAsserts("""
+				algorithme
+				variables
+				  s : chaîne;
+				début
+				  s <- "abc";
+				  écrire(longueur(s));
+				  écrire(s[2]);
+				fin
+				""").assertOutputs(new Int(3), new Char('b'));
+	}
+
+	@Test
+	void write_multipleArguments_preservesOrder_andTypes() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				début
+				  x <- 4;
+				  écrire("x=", x, ", ok=", x = 4);
+				fin
+				""").assertOutputs(new Str("x="), new Int(4), new Str(", ok="), new Bool(true));
+	}
+
+	@Test
+	void precedenceAndAssociativity_areCorrect() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				début
+				  x <- 1 + 2 * 3;
+				  écrire(x);
+				  x <- (1 + 2) * 3;
+				  écrire(x);
+				  x <- 10 - 3 - 2;
+				  écrire(x);
+				fin
+				""").assertOutputs(new Int(7), new Int(9), new Int(5));
+	}
+
+	@Test
+	void booleanOperators_andComparison_work() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  x : entier;
+				début
+				  x <- 3;
+				  écrire(x < 4);
+				  écrire(x = 3);
+				  écrire(x = 2);
+				fin
+				""").assertOutputs(new Bool(true), new Bool(true), new Bool(false));
 	}
 
 	/* =========================
-	 * ==== RUNTIME ERRORS =====
+	 * ==== RUNTIME ERRORS ======
 	 * ========================= */
-	
+
 	@Test
 	void breakOutsideLoop_isReported() {
-		String source = """
-			algorithme
-			variables
-			début
-				interrompre;
-			fin
-			""";
-		assertHasErrorContaining(source, "Interrompre ne peut pas être en dehors d'une boucle");
+		new LeaAsserts("""
+				algorithme
+				variables
+				début
+				  interrompre;
+				fin
+				""").assertHasErrorContaining(Phase.RUNTIME, "Interrompre ne peut pas être en dehors d'une boucle");
 	}
 
 	@Test
 	void arrayIndexOutOfBounds_isReported() {
-		String source = """
-			algorithme
-			variables
-				a : tableau de entier;
-			début
-				a <- [1, 2];
-				écrire(a[3]);
-			fin
-			""";
-		assertHasErrorContaining(source, "Indice hors limites");
+		new LeaAsserts("""
+				algorithme
+				variables
+				  a : tableau de entier;
+				début
+				  a <- [1, 2];
+				  écrire(a[3]);
+				fin
+				""").assertHasErrorContaining(Phase.RUNTIME, "Indice hors limites");
 	}
 
 	@Test
 	void stringIndexOutOfBounds_isReported() {
-		String source = """
-			algorithme
-			variables
-				s : chaîne;
-			début
-				s <- "ab";
-				écrire(s[3]);
-			fin
-			""";
-		assertHasErrorContaining(source, "Indice hors limites");
-	}
-	
-	@Test
-	void invalidArraySize_isReported() {
-		String source = """
-			algorithme
-			variables
-				a : tableau de entier;
-			début
-				a <- tableau(-1, 0);
-			fin
-			""";
-		assertHasErrorContaining(source, "Taille invalide");
+		new LeaAsserts("""
+				algorithme
+				variables
+				  s : chaîne;
+				début
+				  s <- "ab";
+				  écrire(s[3]);
+				fin
+				""").assertHasErrorContaining(Phase.RUNTIME, "Indice hors limites");
 	}
 
 	@Test
-	void infiniteForLoop_isReported() {
-		String source = """
-			algorithme
-			variables
-				i : entier;
-			début
-				pour i de 1 à 5 pas 0 faire
-					écrire(i);
-				fin pour
-			fin
-			""";
-		assertHasErrorContaining(source, "Boucle pour infinie");
+	void invalidArraySize_isReported() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  a : tableau de entier;
+				début
+				  a <- tableau(-1, 0);
+				fin
+				""").assertHasErrorContaining(Phase.RUNTIME, "Taille invalide");
+	}
+
+	@Test
+	void infiniteForLoop_isReported_stepIsZero() {
+		new LeaAsserts("""
+				algorithme
+				variables
+				  i : entier;
+				début
+				  pour i de 1 à 5 pas 0 faire
+				    écrire(i);
+				  fin pour
+				fin
+				""").assertHasErrorContaining(Phase.RUNTIME, "Boucle pour infinie");
 	}
 
 	@Test
 	void infiniteForLoop_decreasingStepIsNonNegative_isReported() {
-		String source = """
-			algorithme
-			variables
-				i : entier;
-			début
-				pour i de 5 à 1 pas 1 faire
-					écrire(i);
-				fin pour
-			fin
-			""";
-		assertHasErrorContaining(source, "Boucle pour infinie");
+		new LeaAsserts("""
+				algorithme
+				variables
+				  i : entier;
+				début
+				  pour i de 5 à 1 pas 1 faire
+				    écrire(i);
+				  fin pour
+				fin
+				""").assertHasErrorContaining(Phase.RUNTIME, "Boucle pour infinie");
 	}
-	
+
 	@Test
 	void infiniteForLoop_decreasingStepIsZero_isReported() {
-		String source = """
-			algorithme
-			variables
-				i : entier;
-			début
-				pour i de 5 à 1 pas 0 faire
-					écrire(i);
-				fin pour
-			fin
-			""";
-		assertHasErrorContaining(source, "Boucle pour infinie");
+		new LeaAsserts("""
+				algorithme
+				variables
+				  i : entier;
+				début
+				  pour i de 5 à 1 pas 0 faire
+				    écrire(i);
+				  fin pour
+				fin
+				""").assertHasErrorContaining(Phase.RUNTIME, "Boucle pour infinie");
 	}
-	
 }

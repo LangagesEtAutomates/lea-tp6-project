@@ -83,7 +83,6 @@
 			</classpath>
 	        <arg value="--scan-classpath"/>
 	        <arg value="--details=tree"/>
-	        <arg value="--disable-ansi-colors"/>
 	    </java>
 	</target>
 	
