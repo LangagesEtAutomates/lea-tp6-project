@@ -156,7 +156,7 @@ public class Interpreter {
 		for(int i = 0; i < length; i++) {
 			array[i] = byDefault;
 		}
-		return new Array(new TArray(TypeChecker.type(array[0])), array);
+		return new Array(new TArray(TypeChecker.type(byDefault)), array);
 	}
 
 	private Value eval(Sum s) throws PanicException {
